@@ -1,14 +1,9 @@
 package com.example.judotournamenttracker.ui
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardOptions
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.judotournamenttracker.data.Tournament
@@ -54,13 +49,10 @@ fun AddTournamentScreen(
             Spacer(modifier = Modifier.height(8.dp))
             TextField(
                 value = date,
-                onValueChange = { input ->
-                    date = input.replace("[^\\d.]".toRegex(), "")
-                },
-                label = { Text("Datum (DD.MM.RRRR)") },
+                onValueChange = { date = it },
+                label = { Text("Datum") },
                 modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                isError = showError && !isValidDate(date)
+                isError = showError && date.isBlank()
             )
             Spacer(modifier = Modifier.height(8.dp))
             TextField(
@@ -73,7 +65,7 @@ fun AddTournamentScreen(
             Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = {
-                    if (name.isBlank() || location.isBlank() || !isValidDate(date) || description.isBlank()) {
+                    if (name.isBlank() || location.isBlank() || date.isBlank() || description.isBlank()) {
                         showError = true
                     } else {
                         showError = false
@@ -96,16 +88,11 @@ fun AddTournamentScreen(
             if (showError) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Vyplňte všechna pole a zadejte platné datum ve formátu DD.MM.RRRR!",
+                    text = "Všechna pole musí být vyplněna!",
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
         }
     }
-}
-
-fun isValidDate(date: String): Boolean {
-    val regex = Regex("""^(0[1-9]|[12][0-9]|3[01])\.(0[1-9]|1[0-2])\.(\d{4})$""")
-    return regex.matches(date)
 }

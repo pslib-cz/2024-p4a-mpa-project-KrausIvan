@@ -29,11 +29,20 @@ fun TournamentListScreen(
             TopAppBar(title = { Text("Judo Závody") })
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate("add_tournament") },
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(16.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Přidat závod")
+                FloatingActionButton(
+                    onClick = { navController.navigate("add_tournament") }
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Přidat závod")
+                }
+                FloatingActionButton(
+                    onClick = { navController.navigate("add_category") }
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Přidat kategorii")
+                }
             }
         }
     ) { innerPadding ->
