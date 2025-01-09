@@ -1,32 +1,50 @@
 package com.example.judotournamenttracker.ui
 
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.judotournamenttracker.data.Category
 import com.example.judotournamenttracker.data.Tournament
 import com.example.judotournamenttracker.viewmodel.TournamentViewModel
 import com.google.gson.Gson
+import kotlinx.coroutines.runBlocking
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TournamentListScreen(
     navController: NavController,
-    viewModel: TournamentViewModel
+    viewModel: TournamentViewModel,
+    context: Context
 ) {
     val tournaments = viewModel.tournaments.collectAsState()
+    val categories = viewModel.categories.collectAsState()
+    var selectedCategory by remember { mutableStateOf<Category?>(null) }
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Judo Závody") })
+            TopAppBar(
+                title = { Text("Judo Závody") },
+                actions = {
+                    IconButton(onClick = {
+                        exportDataToJson(context, tournaments.value)
+                        Toast.makeText(context, "Data byla exportována", Toast.LENGTH_SHORT).show()
+                    }) {
+                        Icon(Icons.Default.FileDownload, contentDescription = "Exportovat data")
+                    }
+                }
+            )
         },
         floatingActionButton = {
             Column(
@@ -46,14 +64,58 @@ fun TournamentListScreen(
             }
         }
     ) { innerPadding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(16.dp)
         ) {
-            items(tournaments.value) { tournament ->
-                TournamentCard(tournament, navController)
+            DropdownMenuForCategories(categories.value, selectedCategory) {
+                selectedCategory = it
+            }
+
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(
+                    if (selectedCategory != null) {
+                        tournaments.value.filter { tournament ->
+                            viewModel.isTournamentInCategory(tournament, selectedCategory!!)
+                        }
+                    } else {
+                        tournaments.value
+                    }
+                ) { tournament ->
+                    TournamentCard(tournament, navController)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DropdownMenuForCategories(
+    categories: List<Category>,
+    selectedCategory: Category?,
+    onCategorySelected: (Category) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = { expanded = true }) {
+            Text(text = selectedCategory?.name ?: "Vyberte kategorii")
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            categories.forEach { category ->
+                DropdownMenuItem(
+                    text = { Text(category.name) },
+                    onClick = {
+                        expanded = false
+                        onCategorySelected(category)
+                    }
+                )
             }
         }
     }
@@ -88,4 +150,10 @@ fun TournamentCard(tournament: Tournament, navController: NavController) {
             )
         }
     }
+}
+
+fun exportDataToJson(context: Context, tournaments: List<Tournament>) {
+    val json = Gson().toJson(tournaments)
+    val file = File(context.getExternalFilesDir(null), "tournaments.json")
+    file.writeText(json)
 }

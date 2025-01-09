@@ -2,12 +2,11 @@ package com.example.judotournamenttracker.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.judotournamenttracker.data.Category
-import com.example.judotournamenttracker.data.Tournament
-import com.example.judotournamenttracker.data.TournamentDao
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import com.example.judotournamenttracker.data.*
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class TournamentViewModel(private val tournamentDao: TournamentDao) : ViewModel() {
 
@@ -17,14 +16,26 @@ class TournamentViewModel(private val tournamentDao: TournamentDao) : ViewModel(
     private val _categories = MutableStateFlow<List<Category>>(emptyList())
     val categories: StateFlow<List<Category>> = _categories
 
+    private val _selectedCategoryId = MutableStateFlow<Int?>(null)
+    val filteredTournaments: StateFlow<List<Tournament>> = combine(
+        _tournaments, _selectedCategoryId
+    ) { tournaments, categoryId ->
+        if (categoryId == null) {
+            tournaments
+        } else {
+            tournaments.filter { tournament ->
+                val tournamentWithCategories = tournamentDao.getTournamentWithCategories(tournament.id)
+                tournamentWithCategories.firstOrNull()?.categories?.any { it.id == categoryId } == true
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     init {
         viewModelScope.launch {
-            // Sledování turnajů
             tournamentDao.getAllTournaments().collect { tournaments ->
                 _tournaments.value = tournaments
             }
 
-            // Sledování kategorií
             tournamentDao.getAllCategories().collect { categories ->
                 _categories.value = categories
             }
@@ -41,5 +52,21 @@ class TournamentViewModel(private val tournamentDao: TournamentDao) : ViewModel(
         viewModelScope.launch {
             tournamentDao.insertCategory(category)
         }
+    }
+
+    fun addTournamentToCategory(tournamentId: Int, categoryId: Int) {
+        viewModelScope.launch {
+            tournamentDao.insertTournamentCategoryCrossRef(
+                TournamentCategoryCrossRef(tournamentId, categoryId)
+            )
+        }
+    }
+
+    fun setSelectedCategory(categoryId: Int?) {
+        _selectedCategoryId.value = categoryId
+    }
+
+    fun exportTournaments(): String {
+        return Json.encodeToString(_tournaments.value)
     }
 }

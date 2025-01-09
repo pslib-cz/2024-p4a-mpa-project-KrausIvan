@@ -2,27 +2,30 @@ package com.example.judotournamenttracker.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.ColumnInfo
 
-// Tabulka pro turnaje
-@Entity
+@Entity(tableName = "tournaments")
 data class Tournament(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0, // Primární klíč s automatickým generováním
-    val name: String, // Název turnaje
-    val location: String, // Lokace turnaje
-    val date: String, // Datum turnaje
-    val description: String // Popis turnaje
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "tournament_id") val id: Int = 0,
+    @ColumnInfo(name = "name") val name: String,
+    @ColumnInfo(name = "location") val location: String,
+    @ColumnInfo(name = "date") val date: String,
+    @ColumnInfo(name = "description") val description: String
 )
 
-// Tabulka pro kategorie
-@Entity
+@Entity(tableName = "categories")
 data class Category(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0, // Primární klíč s automatickým generováním
-    val name: String // Název kategorie
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "category_id") val id: Int = 0,
+    @ColumnInfo(name = "name") val name: String,
 )
 
-// Vazební tabulka pro relaci N:M mezi turnaji a kategoriemi
-@Entity(primaryKeys = ["tournamentId", "categoryId"])
+@Entity(
+    tableName = "tournament_category_cross_ref",
+    primaryKeys = ["tournament_id", "category_id"]
+)
 data class TournamentCategoryCrossRef(
-    val tournamentId: Int, // ID turnaje
-    val categoryId: Int // ID kategorie
+    @ColumnInfo(name = "tournament_id") val tournamentId: Int,
+    @ColumnInfo(name = "category_id") val categoryId: Int,
 )
