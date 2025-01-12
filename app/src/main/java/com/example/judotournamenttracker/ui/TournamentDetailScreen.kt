@@ -13,6 +13,7 @@ import androidx.navigation.NavController
 import com.example.judotournamenttracker.data.Tournament
 import com.example.judotournamenttracker.viewmodel.TournamentViewModel
 import com.google.gson.Gson
+import kotlinx.coroutines.runBlocking
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -21,6 +22,13 @@ fun TournamentDetailScreen(
     viewModel: TournamentViewModel,
     tournament: Tournament
 ) {
+    val twc = remember(tournament.id) {
+        runBlocking {
+            viewModel.loadTournamentCategoriesOnce(tournament.id)
+        }
+    }
+    val categories = twc?.categories ?: emptyList()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -46,17 +54,25 @@ fun TournamentDetailScreen(
                 }
             )
         }
-    ) { paddingValues ->
+    ) { pad ->
         Column(
             modifier = Modifier
-                .padding(paddingValues)
+                .padding(pad)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(text = "Název: ${tournament.name}", style = MaterialTheme.typography.titleLarge)
-            Text(text = "Místo: ${tournament.location}")
-            Text(text = "Datum: ${tournament.date}")
-            Text(text = "Popis: ${tournament.description}")
+            Text("Název: ${tournament.name}", style = MaterialTheme.typography.titleLarge)
+            Text("Místo: ${tournament.location}")
+            Text("Datum: ${tournament.date}")
+            Text("Popis: ${tournament.description}")
+
+            if (categories.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Kategorie:", style = MaterialTheme.typography.titleMedium)
+                categories.forEach { cat ->
+                    Text("- ${cat.name}")
+                }
+            }
         }
     }
 }

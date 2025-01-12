@@ -6,7 +6,7 @@ import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.judotournamenttracker.data.Tournament
+import com.example.judotournamenttracker.data.TournamentWithCategories
 import com.example.judotournamenttracker.viewmodel.TournamentViewModel
 import com.google.gson.Gson
 import androidx.compose.runtime.collectAsState
@@ -35,19 +36,16 @@ fun TournamentListScreen(
 ) {
     val context = LocalContext.current
     val searchText by viewModel.searchText.collectAsState()
-    val tournaments by viewModel.filteredTournaments.collectAsState()
+    val twcList by viewModel.filteredTournamentsWithCats.collectAsState()
     val categories by viewModel.categories.collectAsState()
 
     var expandedCategoryFilter by remember { mutableStateOf(false) }
 
-    val createDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/pdf")
-    ) { uri: Uri? ->
+    val createDocLauncher = rememberLauncherForActivityResult(CreateDocument("application/pdf")) { uri ->
         if (uri != null) {
-            exportTournamentsToPdf(context, tournaments, uri)
-            Toast.makeText(context, "PDF bylo exportováno", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(context, "Export zrušen", Toast.LENGTH_SHORT).show()
+            val justTournaments = twcList.map { it.tournament }
+            exportTournamentsToPdf(context, justTournaments, uri)
+            Toast.makeText(context, "PDF exportováno", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -65,12 +63,12 @@ fun TournamentListScreen(
                 },
                 actions = {
                     IconButton(onClick = { viewModel.toggleSortOrder() }) {
-                        Icon(Icons.Default.Sort, contentDescription = "Seřadit podle data")
+                        Icon(Icons.Default.Sort, contentDescription = "Seřadit")
                     }
                     IconButton(onClick = {
-                        createDocumentLauncher.launch("turnaje_export.pdf")
+                        createDocLauncher.launch("turnaje_export.pdf")
                     }) {
-                        Icon(Icons.Default.FileDownload, contentDescription = "Exportovat do PDF")
+                        Icon(Icons.Default.FileDownload, contentDescription = "Export do PDF")
                     }
                     IconButton(onClick = {
                         navController.navigate("category_list")
@@ -81,14 +79,16 @@ fun TournamentListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { navController.navigate("add_tournament") }) {
+            FloatingActionButton(onClick = {
+                navController.navigate("add_tournament")
+            }) {
                 Icon(Icons.Default.Add, contentDescription = "Přidat turnaj")
             }
         }
-    ) { paddingValues ->
+    ) { pad ->
         Column(
             modifier = Modifier
-                .padding(paddingValues)
+                .padding(pad)
                 .padding(12.dp)
                 .fillMaxSize()
         ) {
@@ -116,9 +116,9 @@ fun TournamentListScreen(
             }
             Spacer(modifier = Modifier.height(12.dp))
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(tournaments) { tournament ->
-                    TournamentCard(tournament) {
-                        val json = Gson().toJson(tournament)
+                items(twcList) { twc ->
+                    TournamentCard(twc) {
+                        val json = Gson().toJson(twc.tournament)
                         navController.navigate("tournament_detail/$json")
                     }
                 }
@@ -128,55 +128,53 @@ fun TournamentListScreen(
 }
 
 @Composable
-fun TournamentCard(tournament: Tournament, onClick: () -> Unit) {
+fun TournamentCard(twc: TournamentWithCategories, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable { onClick() },
         elevation = CardDefaults.cardElevation(3.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(text = tournament.name, style = MaterialTheme.typography.titleLarge)
+            Text(twc.tournament.name, style = MaterialTheme.typography.titleLarge)
             Spacer(modifier = Modifier.height(4.dp))
-            Text(text = "Datum: ${tournament.date}")
-            Text(text = "Místo: ${tournament.location}")
+            Text("Datum: ${twc.tournament.date}")
+            Text("Místo: ${twc.tournament.location}")
+            if (twc.categories.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                val catStr = twc.categories.joinToString { it.name }
+                Text("Kategorie: $catStr")
+            }
         }
     }
 }
 
-fun exportTournamentsToPdf(context: Context, tournaments: List<Tournament>, outputUri: Uri) {
-    val pdfDocument = PdfDocument()
+fun exportTournamentsToPdf(context: Context, tournaments: List<Tournament>, uri: Uri) {
+    val pdf = PdfDocument()
     val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create()
-    val page = pdfDocument.startPage(pageInfo)
+    val page = pdf.startPage(pageInfo)
     val canvas = page.canvas
     val paint = Paint().apply { textSize = 14f }
 
-    var yPosition = 50f
+    var yPos = 50f
     val startX = 50f
-
-    canvas.drawText("Seznam turnajů", startX, yPosition, paint)
-    yPosition += 40
+    canvas.drawText("Seznam turnajů", startX, yPos, paint)
+    yPos += 40
 
     for (t in tournaments) {
-        canvas.drawText("Název: ${t.name}", startX, yPosition, paint)
-        yPosition += 20
-        canvas.drawText("Místo: ${t.location}", startX, yPosition, paint)
-        yPosition += 20
-        canvas.drawText("Datum: ${t.date}", startX, yPosition, paint)
-        yPosition += 20
-        canvas.drawText("Popis: ${t.description}", startX, yPosition, paint)
-        yPosition += 40
+        canvas.drawText("Název: ${t.name}", startX, yPos, paint)
+        yPos += 20
+        canvas.drawText("Místo: ${t.location}", startX, yPos, paint)
+        yPos += 20
+        canvas.drawText("Datum: ${t.date}", startX, yPos, paint)
+        yPos += 20
+        canvas.drawText("Popis: ${t.description}", startX, yPos, paint)
+        yPos += 40
     }
+    pdf.finishPage(page)
 
-    pdfDocument.finishPage(page)
-
-    try {
-        context.contentResolver.openOutputStream(outputUri)?.use { outputStream: OutputStream ->
-            pdfDocument.writeTo(outputStream)
-        }
-    } catch (e: Exception) {
-        e.printStackTrace()
-    } finally {
-        pdfDocument.close()
+    context.contentResolver.openOutputStream(uri)?.use { output ->
+        pdf.writeTo(output)
     }
+    pdf.close()
 }

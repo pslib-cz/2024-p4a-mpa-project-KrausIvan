@@ -6,7 +6,6 @@ import androidx.room.Relation
 
 data class TournamentWithCategories(
     @Embedded val tournament: Tournament,
-
     @Relation(
         parentColumn = "tournament_id",
         entityColumn = "category_id",

@@ -19,6 +19,10 @@ interface TournamentDao {
     fun getAllTournaments(): Flow<List<Tournament>>
 
     @Transaction
+    @Query("SELECT * FROM tournaments")
+    fun getAllTournamentsWithCategories(): Flow<List<TournamentWithCategories>>
+
+    @Transaction
     @Query("SELECT * FROM tournaments WHERE tournament_id = :tournamentId")
     fun getTournamentWithCategories(tournamentId: Int): Flow<TournamentWithCategories>
 
@@ -46,7 +50,6 @@ interface TournamentDao {
 
     @Query("SELECT COUNT(*) FROM tournaments")
     suspend fun getAllTournamentsCount(): Int
-
 }
 
 @Database(
@@ -55,7 +58,7 @@ interface TournamentDao {
         Category::class,
         TournamentCategoryCrossRef::class
     ],
-    version = 4,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

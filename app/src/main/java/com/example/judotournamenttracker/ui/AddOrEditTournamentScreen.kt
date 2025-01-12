@@ -1,6 +1,8 @@
 package com.example.judotournamenttracker.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -23,15 +25,22 @@ fun AddOrEditTournamentScreen(
     var location by remember { mutableStateOf(tournamentToEdit?.location ?: "") }
     var date by remember { mutableStateOf(tournamentToEdit?.date ?: "") }
     var description by remember { mutableStateOf(tournamentToEdit?.description ?: "") }
-    var selectedCategoryId by remember { mutableStateOf<Int?>(null) }
-    val oldCategoryId = remember(tournamentToEdit) {
+
+    var selectedCatIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
+
+    LaunchedEffect(tournamentToEdit) {
         if (tournamentToEdit != null) {
-            runBlocking {
-                val twc = viewModel.getTournamentCategoriesFlow(tournamentToEdit.id).value
-                twc?.categories?.firstOrNull()?.id
+            val twc = runBlocking {
+                viewModel.loadTournamentCategoriesOnce(tournamentToEdit.id)
             }
-        } else null
+            val preSelected = twc?.categories
+                ?.map { it.id }
+                ?.toSet()
+                ?: emptySet()
+            selectedCatIds = preSelected
+        }
     }
+
     var showError by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -77,12 +86,30 @@ fun AddOrEditTournamentScreen(
                 modifier = Modifier.fillMaxWidth(),
                 isError = showError && description.isBlank()
             )
-            Text("Kategorie (nepovinné)", style = MaterialTheme.typography.bodyLarge)
-            CategoryDropdown(
-                categories = allCategories,
-                selectedCategoryId = selectedCategoryId,
-                onCategorySelected = { selectedCategoryId = it }
-            )
+
+            Text("Kategorie (můžete vybrat více):", style = MaterialTheme.typography.bodyLarge)
+
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                items(allCategories) { cat ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(cat.name, modifier = Modifier.padding(end = 8.dp))
+                        Checkbox(
+                            checked = selectedCatIds.contains(cat.id),
+                            onCheckedChange = { isChecked ->
+                                selectedCatIds = if (isChecked) {
+                                    selectedCatIds + cat.id
+                                } else {
+                                    selectedCatIds - cat.id
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
             Button(
                 onClick = {
                     if (name.isBlank() || location.isBlank() || date.isBlank() || description.isBlank()) {
@@ -90,14 +117,14 @@ fun AddOrEditTournamentScreen(
                     } else {
                         showError = false
                         if (tournamentToEdit == null) {
-                            viewModel.addTournament(
+                            viewModel.addTournamentMulti(
                                 Tournament(
                                     name = name,
                                     location = location,
                                     date = date,
                                     description = description
                                 ),
-                                categoryId = selectedCategoryId
+                                selectedCatIds
                             )
                         } else {
                             val updated = tournamentToEdit.copy(
@@ -106,11 +133,7 @@ fun AddOrEditTournamentScreen(
                                 date = date,
                                 description = description
                             )
-                            viewModel.updateTournament(
-                                updated,
-                                newCategoryId = selectedCategoryId,
-                                oldCategoryId = oldCategoryId
-                            )
+                            viewModel.updateTournamentMulti(updated, selectedCatIds)
                         }
                         navController.navigateUp()
                     }
@@ -121,46 +144,9 @@ fun AddOrEditTournamentScreen(
             }
             if (showError) {
                 Text(
-                    text = "Všechna pole (kromě kategorie) musí být vyplněna!",
+                    text = "Všechna pole (kromě kategorií) musí být vyplněna!",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun CategoryDropdown(
-    categories: List<Category>,
-    selectedCategoryId: Int?,
-    onCategorySelected: (Int?) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedCategory = categories.find { it.id == selectedCategoryId }
-
-    Box {
-        OutlinedButton(onClick = { expanded = true }) {
-            Text(text = selectedCategory?.name ?: "Žádná vybraná kategorie")
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            DropdownMenuItem(
-                text = { Text("Žádná") },
-                onClick = {
-                    onCategorySelected(null)
-                    expanded = false
-                }
-            )
-            categories.forEach { cat ->
-                DropdownMenuItem(
-                    text = { Text(cat.name) },
-                    onClick = {
-                        onCategorySelected(cat.id)
-                        expanded = false
-                    }
                 )
             }
         }

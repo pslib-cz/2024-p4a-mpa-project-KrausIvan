@@ -2,17 +2,8 @@ package com.example.judotournamenttracker.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.judotournamenttracker.data.Category
-import com.example.judotournamenttracker.data.Tournament
-import com.example.judotournamenttracker.data.TournamentCategoryCrossRef
-import com.example.judotournamenttracker.data.TournamentDao
-import com.example.judotournamenttracker.data.TournamentWithCategories
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.stateIn
+import com.example.judotournamenttracker.data.*
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
@@ -20,8 +11,8 @@ import kotlinx.serialization.json.Json
 
 class TournamentViewModel(private val tournamentDao: TournamentDao) : ViewModel() {
 
-    private val _tournaments = MutableStateFlow<List<Tournament>>(emptyList())
-    val tournaments: StateFlow<List<Tournament>> = _tournaments
+    private val _allTournamentsWithCats = MutableStateFlow<List<TournamentWithCategories>>(emptyList())
+    val allTournamentsWithCats: StateFlow<List<TournamentWithCategories>> = _allTournamentsWithCats
 
     private val _categories = MutableStateFlow<List<Category>>(emptyList())
     val categories: StateFlow<List<Category>> = _categories
@@ -35,8 +26,8 @@ class TournamentViewModel(private val tournamentDao: TournamentDao) : ViewModel(
 
     init {
         viewModelScope.launch {
-            tournamentDao.getAllTournaments().collect { list ->
-                _tournaments.value = list
+            tournamentDao.getAllTournamentsWithCategories().collect { list ->
+                _allTournamentsWithCats.value = list
             }
         }
         viewModelScope.launch {
@@ -46,54 +37,61 @@ class TournamentViewModel(private val tournamentDao: TournamentDao) : ViewModel(
         }
     }
 
-    val filteredTournaments: StateFlow<List<Tournament>> =
-        combine(_tournaments, _selectedCategoryId, _searchText, _sortAscending)
-        { allTournaments, categoryId, text, asc ->
-            val catFiltered = if (categoryId == null) {
-                allTournaments
+    val filteredTournamentsWithCats: StateFlow<List<TournamentWithCategories>> =
+        combine(
+            allTournamentsWithCats,
+            _selectedCategoryId,
+            _searchText,
+            _sortAscending
+        ) { all, catId, text, asc ->
+            val catFiltered = if (catId == null) {
+                all
             } else {
-                allTournaments.filter { t ->
-                    val flow = tournamentDao.getTournamentWithCategories(t.id)
-                    runBlocking {
-                        val twc = flow.firstOrNull()
-                        twc?.categories?.any { it.id == categoryId } ?: false
-                    }
+                all.filter { twc ->
+                    twc.categories.any { it.id == catId }
                 }
             }
             val searchFiltered = if (text.isBlank()) {
                 catFiltered
             } else {
-                catFiltered.filter { it.name.contains(text, ignoreCase = true) }
+                catFiltered.filter {
+                    it.tournament.name.contains(text, ignoreCase = true)
+                }
             }
             if (asc) {
-                searchFiltered.sortedBy { it.date }
+                searchFiltered.sortedBy { it.tournament.date }
             } else {
-                searchFiltered.sortedByDescending { it.date }
+                searchFiltered.sortedByDescending { it.tournament.date }
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun addTournament(tournament: Tournament, categoryId: Int?) {
+    fun addTournamentMulti(tournament: Tournament, categoryIds: Set<Int>) {
         viewModelScope.launch {
             val newId = tournamentDao.insertTournamentReturnId(tournament)
-            if (categoryId != null) {
+            categoryIds.forEach { catId ->
                 tournamentDao.insertTournamentCategoryCrossRef(
-                    TournamentCategoryCrossRef(newId.toInt(), categoryId)
+                    TournamentCategoryCrossRef(newId.toInt(), catId)
                 )
             }
         }
     }
 
-    fun updateTournament(tournament: Tournament, newCategoryId: Int?, oldCategoryId: Int?) {
+    fun updateTournamentMulti(tournament: Tournament, newCategoryIds: Set<Int>) {
         viewModelScope.launch {
             tournamentDao.updateTournament(tournament)
-            if (oldCategoryId != null) {
+            val oldCats = tournamentDao
+                .getTournamentWithCategories(tournament.id)
+                .firstOrNull()
+                ?.categories
+                ?: emptyList()
+            oldCats.forEach { oldCat ->
                 tournamentDao.deleteTournamentCategoryCrossRef(
-                    TournamentCategoryCrossRef(tournament.id, oldCategoryId)
+                    TournamentCategoryCrossRef(tournament.id, oldCat.id)
                 )
             }
-            if (newCategoryId != null) {
+            newCategoryIds.forEach { catId ->
                 tournamentDao.insertTournamentCategoryCrossRef(
-                    TournamentCategoryCrossRef(tournament.id, newCategoryId)
+                    TournamentCategoryCrossRef(tournament.id, catId)
                 )
             }
         }
@@ -117,9 +115,11 @@ class TournamentViewModel(private val tournamentDao: TournamentDao) : ViewModel(
         }
     }
 
-    fun getTournamentCategoriesFlow(tournamentId: Int): StateFlow<TournamentWithCategories?> {
-        return tournamentDao.getTournamentWithCategories(tournamentId)
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    fun loadTournamentCategoriesOnce(tournamentId: Int): TournamentWithCategories? {
+        return runBlocking {
+            tournamentDao.getTournamentWithCategories(tournamentId)
+                .firstOrNull()
+        }
     }
 
     fun setSelectedCategory(categoryId: Int?) {
@@ -135,15 +135,7 @@ class TournamentViewModel(private val tournamentDao: TournamentDao) : ViewModel(
     }
 
     fun exportTournaments(): String {
-        return Json.encodeToString(_tournaments.value)
-    }
-
-    fun isTournamentInCategory(tournament: Tournament, category: Category): Boolean {
-        return runBlocking {
-            val twc = tournamentDao
-                .getTournamentWithCategories(tournament.id)
-                .firstOrNull()
-            twc?.categories?.any { it.id == category.id } ?: false
-        }
+        val justTournaments = _allTournamentsWithCats.value.map { it.tournament }
+        return Json.encodeToString(justTournaments)
     }
 }
