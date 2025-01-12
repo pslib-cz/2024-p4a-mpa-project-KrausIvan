@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     id("kotlin-kapt")
-    id("org.jetbrains.kotlin.plugin.serialization") // Správný plugin pro serialization
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.8.10"
 }
 
 android {
@@ -59,7 +59,6 @@ dependencies {
     kapt("androidx.room:room-compiler:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
 
-    // Android Core a Jetpack Compose
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -71,7 +70,6 @@ dependencies {
     implementation(libs.androidx.navigation.runtime.ktx)
     implementation(libs.androidx.navigation.compose)
 
-    // Testovací závislosti
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -79,8 +77,14 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.navigation:navigation-compose:2.7.3")
+// ...
+    implementation("androidx.compose.runtime:runtime")
+    implementation("androidx.compose.material:material-icons-extended:1.5.0")
 
-    // Kotlin Serialization a GSON
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
     implementation("com.google.code.gson:gson:2.10.1")
 }

@@ -19,11 +19,12 @@ fun AddCategoryScreen(navController: NavController, viewModel: TournamentViewMod
         topBar = {
             TopAppBar(title = { Text("Přidat kategorii") })
         }
-    ) { innerPadding ->
+    ) { paddingValues ->
         Column(
             modifier = Modifier
-                .padding(innerPadding)
-                .padding(16.dp)
+                .padding(paddingValues)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             TextField(
                 value = categoryName,
@@ -32,7 +33,6 @@ fun AddCategoryScreen(navController: NavController, viewModel: TournamentViewMod
                 modifier = Modifier.fillMaxWidth(),
                 isError = showError && categoryName.isBlank()
             )
-            Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = {
                     if (categoryName.isBlank()) {
@@ -47,13 +47,11 @@ fun AddCategoryScreen(navController: NavController, viewModel: TournamentViewMod
             ) {
                 Text("Uložit")
             }
-
             if (showError) {
-                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Název kategorie nesmí být prázdný!",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
                 )
             }
         }

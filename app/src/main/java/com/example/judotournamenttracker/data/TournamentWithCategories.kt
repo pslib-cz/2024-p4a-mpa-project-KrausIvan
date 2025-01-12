@@ -5,15 +5,16 @@ import androidx.room.Junction
 import androidx.room.Relation
 
 data class TournamentWithCategories(
-    @Embedded val tournament: Tournament, // Základní informace o turnaji
+    @Embedded val tournament: Tournament,
+
     @Relation(
-        parentColumn = "id",
-        entityColumn = "id",
+        parentColumn = "tournament_id",
+        entityColumn = "category_id",
         associateBy = Junction(
             value = TournamentCategoryCrossRef::class,
-            parentColumn = "tournamentId",
-            entityColumn = "categoryId"
+            parentColumn = "tournament_id",
+            entityColumn = "category_id"
         )
     )
-    val categories: List<Category> // Seznam kategorií spojených s turnajem
+    val categories: List<Category>
 )
